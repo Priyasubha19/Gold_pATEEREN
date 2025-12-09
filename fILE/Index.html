@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Babylon.js 3D Viewer with AR</title>
+
+    <!-- Babylon.js core -->
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/loaders/babylon.glTF2FileLoader.js"></script>
+    <!-- WebXR -->
+    <script src="https://cdn.babylonjs.com/xr/babylon.xr.js"></script>
+
+    <style>
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            background: #111;
+            font-family: Arial, sans-serif;
+        }
+
+        #renderCanvas {
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+        }
+
+        .ui-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            padding: 15px;
+            background: rgba(20, 20, 20, 0.8);
+            border-radius: 10px;
+            box-shadow: 0 0 10px #000;
+            z-index: 10;
+        }
+
+        .ui-panel h3 {
+            margin: 0 0 10px 0;
+            color: white;
+        }
+
+        .btn {
+            padding: 10px 16px;
+            margin: 5px;
+            background: #333;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 15px;
+            transition: 0.2s;
+        }
+
+        .btn:hover {
+            background: #555;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="ui-panel">
+    <h3>Change Color</h3>
+    <button class="btn" onclick="changeModelColor('#0000FF')">Blue</button>
+    <button class="btn" onclick="changeModelColor('#000000')">Black</button>
+    <button class="btn" onclick="changeModelColor('#FFD700')">Gold</button>
+    <button class="btn" onclick="changeModelColor('#FFFFFF')">White</button>
+</div>
+
+<canvas id="renderCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById("renderCanvas");
+const engine = new BABYLON.Engine(canvas, true);
+let loadedMeshes = [];
+
+// CREATE SCENE
+const createScene = async function () {
+    const scene = new BABYLON.Scene(engine);
+
+    // CAMERA
+    const camera = new BABYLON.ArcRotateCamera(
+        "camera",
+        -Math.PI / 2,
+        Math.PI / 2.2,
+        3,
+        BABYLON.Vector3.Zero(),
+        scene
+    );
+    camera.attachControl(canvas, true);
+
+    // LIGHTS
+    const hemi = new BABYLON.HemisphericLight("hemi", new BABYLON.Vector3(0, 1, 0), scene);
+    hemi.intensity = 1.4;
+
+    const dirLight = new BABYLON.DirectionalLight(
+        "dirLight",
+        new BABYLON.Vector3(-1, -2, -1),
+        scene
+    );
+    dirLight.position = new BABYLON.Vector3(5, 10, 5);
+    dirLight.intensity = 1.0;
+
+    // HDR ENVIRONMENT
+    const hdr = BABYLON.CubeTexture.CreateFromPrefilteredData(
+        "https://assets.babylonjs.com/environments/environmentSpecular.env",
+        scene
+    );
+    scene.environmentTexture = hdr;
+    scene.environmentIntensity = 1.5;
+
+    // BACKGROUND
+    scene.clearColor = new BABYLON.Color4(0.95, 0.95, 0.95, 1);
+
+    // LOAD GLTF MODEL
+    await BABYLON.SceneLoader.AppendAsync("./", "Gold.gltf", scene);
+    console.log("Model Loaded Successfully");
+    loadedMeshes = scene.meshes;
+
+    // ENABLE XR AR EXPERIENCE
+    const xr = await scene.createDefaultXRExperienceAsync({
+        floorMeshes: [], // leave empty if no ground mesh
+        optionalFeatures: true
+    });
+    // AR button will automatically appear on supported devices
+
+    return scene;
+};
+
+let scene;
+createScene().then(s => scene = s);
+
+// CHANGE COLOR FUNCTION
+function changeModelColor(hexColor) {
+    if (!loadedMeshes || loadedMeshes.length === 0) {
+        console.warn("Model not loaded yet!");
+        return;
+    }
+
+    const babylonColor = BABYLON.Color3.FromHexString(hexColor);
+
+    loadedMeshes.forEach(mesh => {
+        if (mesh.material) {
+            if (mesh.material.albedoColor !== undefined) {
+                mesh.material.albedoColor = babylonColor; // PBR
+            } else {
+                mesh.material.diffuseColor = babylonColor; // Standard
+            }
+        }
+    });
+
+    console.log("Color changed:", hexColor);
+}
+
+// RENDER LOOP
+engine.runRenderLoop(() => {
+    if (scene) scene.render();
+});
+window.addEventListener("resize", () => engine.resize());
+</script>
+
+</body>
+</html>
